@@ -1,0 +1,41 @@
+{
+  "name": "oid-utils",
+  "version": "0.1.0",
+  "description": "Simple utilities for working with MongoDB ObjectIds",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.js",
+    "format": "prettier --write src/**/*.js"
+  },
+  "keywords": [
+    "mongodb",
+    "objectid",
+    "oid",
+    "utilities"
+  ],
+  "author": {
+    "name": "forxinb",
+    "url": "https://github.com/forxinb"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "prettier": "^3.0.0"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forxinb/oid-utils.git"
+  },
+  "bugs": {
+    "url": "https://github.com/forxinb/oid-utils/issues"
+  },
+  "homepage": "https://github.com/forxinb/oid-utils#readme"
+}
