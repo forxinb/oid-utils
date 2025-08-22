@@ -2,12 +2,12 @@
  * Tests for oid-utils
  */
 
-const oidUtils = require('../src/index');
+const ou = require('../src/index');
 
 describe('oid-utils', () => {
   // TODO: Add tests
   
   test('should be defined', () => {
-    expect(oidUtils).toBeDefined();
+    expect(ou).toBeDefined();
   });
 });
