@@ -62,4 +62,74 @@ describe('oid-utils', () => {
       expect(() => ou.toString('invalid')).toThrow('Argument must be an ObjectId instance');
     });
   });
+
+  describe('ou.isAfter()', () => {
+    test('should return true when first ObjectId is after second', () => {
+      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10초 전
+      const timestamp2 = Math.floor(Date.now() / 1000); // 현재
+      const oid1 = ou.new(timestamp1);
+      const oid2 = ou.new(timestamp2);
+      expect(ou.isAfter(oid2, oid1)).toBe(true);
+    });
+
+    test('should return false when first ObjectId is before second', () => {
+      const oid1 = ou.new();
+      const oid2 = ou.new();
+      // oid1이 더 이전에 생성되었으므로 false
+      expect(ou.isAfter(oid1, oid2)).toBe(false);
+    });
+
+    test('should work with Date objects', () => {
+      const date1 = new Date('2023-01-02T00:00:00.000Z');
+      const date2 = new Date('2023-01-01T00:00:00.000Z');
+      expect(ou.isAfter(date1, date2)).toBe(true);
+      expect(ou.isAfter(date2, date1)).toBe(false);
+    });
+
+    test('should work with mixed ObjectId and Date', () => {
+      const oid = ou.new();
+      const date = new Date('2020-01-01T00:00:00.000Z');
+      expect(ou.isAfter(oid, date)).toBe(true);
+      expect(ou.isAfter(date, oid)).toBe(false);
+    });
+
+    test('should throw error for invalid arguments', () => {
+      expect(() => ou.isAfter('invalid', 'invalid')).toThrow('Arguments must be ObjectId instances or Date objects');
+    });
+  });
+
+  describe('ou.isBefore()', () => {
+    test('should return true when first ObjectId is before second', () => {
+      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10초 전
+      const timestamp2 = Math.floor(Date.now() / 1000); // 현재
+      const oid1 = ou.new(timestamp1);
+      const oid2 = ou.new(timestamp2);
+      expect(ou.isBefore(oid1, oid2)).toBe(true);
+    });
+
+    test('should return false when first ObjectId is after second', () => {
+      const oid1 = ou.new();
+      const oid2 = ou.new();
+      // oid2가 더 이전에 생성되었으므로 false
+      expect(ou.isBefore(oid2, oid1)).toBe(false);
+    });
+
+    test('should work with Date objects', () => {
+      const date1 = new Date('2023-01-01T00:00:00.000Z');
+      const date2 = new Date('2023-01-02T00:00:00.000Z');
+      expect(ou.isBefore(date1, date2)).toBe(true);
+      expect(ou.isBefore(date2, date1)).toBe(false);
+    });
+
+    test('should work with mixed ObjectId and Date', () => {
+      const oid = ou.new();
+      const date = new Date('2030-01-01T00:00:00.000Z');
+      expect(ou.isBefore(oid, date)).toBe(true);
+      expect(ou.isBefore(date, oid)).toBe(false);
+    });
+
+    test('should throw error for invalid arguments', () => {
+      expect(() => ou.isBefore('invalid', 'invalid')).toThrow('Arguments must be ObjectId instances or Date objects');
+    });
+  });
 });

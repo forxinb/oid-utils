@@ -7,7 +7,7 @@ const { ObjectId } = require('bson');
 
 /**
  * Create a new ObjectId
- * @param {string|number} [value] - Optional value to create ObjectId from
+ * @param {string|number|ObjectId} [value] - Optional value to create ObjectId from
  * @returns {ObjectId} A new ObjectId instance
  */
 function newOid(value) {
@@ -50,9 +50,45 @@ function toString(oid) {
   return oid.toString();
 }
 
+/**
+ * Check if first value is after second value
+ * @param {ObjectId|Date} value1 - First value to compare
+ * @param {ObjectId|Date} value2 - Second value to compare
+ * @returns {boolean} True if value1 is after value2
+ */
+function isAfter(value1, value2) {
+  const date1 = value1 instanceof ObjectId ? value1.getTimestamp() : value1;
+  const date2 = value2 instanceof ObjectId ? value2.getTimestamp() : value2;
+  
+  if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
+    throw new Error('Arguments must be ObjectId instances or Date objects');
+  }
+  
+  return date1.getTime() > date2.getTime();
+}
+
+/**
+ * Check if first value is before second value
+ * @param {ObjectId|Date} value1 - First value to compare
+ * @param {ObjectId|Date} value2 - Second value to compare
+ * @returns {boolean} True if value1 is before value2
+ */
+function isBefore(value1, value2) {
+  const date1 = value1 instanceof ObjectId ? value1.getTimestamp() : value1;
+  const date2 = value2 instanceof ObjectId ? value2.getTimestamp() : value2;
+  
+  if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
+    throw new Error('Arguments must be ObjectId instances or Date objects');
+  }
+  
+  return date1.getTime() < date2.getTime();
+}
+
 module.exports = {
   new: newOid,
   isValid: isValidOid,
   toDate,
-  toString
+  toString,
+  isAfter,
+  isBefore
 };
