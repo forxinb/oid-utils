@@ -6,81 +6,6 @@
 const { ObjectId } = require('bson');
 
 /**
- * Create a new ObjectId
- *
- * Behavior:
- * - No arguments → returns a fresh ObjectId
- * - When suppressFallback === false (default, "safe" mode):
- *   - Falsy handling: undefined, null, '' are treated as invalid and return fallback
- *   - Validity handling: if canBeOid(value) is false, returns fallback
- *   - Note: 0 and NaN are considered convertible by BSON (timestamp semantics)
- * - When suppressFallback === true ("unsafe" mode):
- *   - Always attempts new ObjectId(value); errors will throw
- *
- * Guidance for 0 / NaN:
- * - If you intentionally want epoch-based ObjectIds from 0/NaN, either use new ObjectId(0|NaN)
- *   or call newOid(0|NaN, { suppressFallback: true }) to bypass safe checks.
- *
- * @param {string|number|ObjectId} [value] - Value to create ObjectId from. Omit to create a fresh ObjectId
- * @param {{ fallback?: any, suppressFallback?: boolean }} [options] - Options
- * @param {any} [options.fallback=null] - Value to return when value is not convertible (only when suppressFallback=false)
- * @param {boolean} [options.suppressFallback=false] - If true, throw on invalid instead of returning fallback
- * @returns {ObjectId|any} A new ObjectId instance or fallback
- */
-function newOid(value, options = {}) {
-  const { fallback = null, suppressFallback = false } = options;
-  // No arguments: generate a fresh ObjectId
-  if (arguments.length === 0) {
-    return new ObjectId();
-  }
-  if (suppressFallback) {
-    return new ObjectId(value);
-  }
-  // Treat undefined, null, and empty string as invalid in fallback mode
-  if (value === undefined || value === null || value === '') {
-    return fallback;
-  }
-  if (!canBeOid(value)) {
-    return fallback;
-  }
-  return new ObjectId(value);
-}
-
-/**
- * Create multiple ObjectIds from array of values
- * @param {any[]} [values=[]] - Array of values to create ObjectIds from
- * @param {{ validOnly?: boolean }} [options] - Options
- * @param {boolean} [options.validOnly=true] - If true, skip non-convertible values instead of throwing
- * @returns {ObjectId[]} Array of ObjectId instances
- */
-function newOids(values = [], options = {}) {
-  const { validOnly = true } = options;
-  const source = validOnly ? values.filter(canBeOid) : values;
-  return source.map((value) => new ObjectId(value));
-}
-
-/**
- * Remove duplicates from an ObjectId array (by string interpolation key)
- * Note: Non-ObjectId values, if present, are also deduped by their interpolated string and preserved.
- * @param {ObjectId[]} [oids=[]] - Array of ObjectId instances
- * @returns {any[]} Array with unique values preserving first occurrence order (ObjectId[] when input is ObjectId-only)
- */
-function unique(oids = []) {
-  const seen = new Set();
-  const result = [];
-  for (const item of oids) {
-    const key = `${item}`; // avoids direct toString() calls
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(item);
-  }
-  return result;
-}
-
-
-/**
  * Check if a value can be converted to ObjectId
  * @param {any} value - Value to check
  * @returns {boolean} True if can be converted to ObjectId
@@ -112,42 +37,98 @@ function isSameOid(value1, value2) {
 }
 
 /**
- * Convert ObjectId to Date
- * @param {ObjectId} oid - ObjectId instance
- * @returns {Date} Date object
+ * Create a new ObjectId
+ * @param {string|number|ObjectId} [value] - Value to create ObjectId from. Omit to create a fresh ObjectId
+ * @param {any} [fallback=null] - Value to return when value is not convertible
+ * @returns {ObjectId|any} A new ObjectId instance or fallback
  */
-function toDate(oid) {
-  if (!isOid(oid)) {
-    throw new Error('Argument must be an ObjectId instance');
+function newOid(value, fallback = null) {
+  if (arguments.length === 0) {
+    return new ObjectId();
   }
-  // getTimestamp() returns Date object
-  return oid.getTimestamp();
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  if (!canBeOid(value)) {
+    return fallback;
+  }
+  return new ObjectId(value);
 }
 
 /**
- * Convert ObjectId to string
- * @param {ObjectId} oid - ObjectId instance
+ * Create multiple ObjectIds from array of values
+ * @param {any[]} [values=[]] - Array of values to create ObjectIds from
+ * @param {boolean} [validOnly=true] - If true, skip non-convertible values instead of throwing
+ * @returns {ObjectId[]} Array of ObjectId instances
+ * @throws {Error} When validOnly=false and non-convertible values are present
+ */
+function newOids(values = [], validOnly = true) {
+  const source = validOnly ? values.filter(canBeOid) : values;
+  return source.map((value) => new ObjectId(value));
+}
+
+/**
+ * Remove duplicate ObjectIds from array
+ * Note: Values that are not ObjectId instances in the input array are filtered out and not included in the result.
+ * @param {ObjectId[]} [oids=[]] - Array of ObjectId instances
+ * @returns {ObjectId[]} Array with unique ObjectId instances preserving first occurrence order
+ */
+function uniqueOids(oids = []) {
+  const seen = new Set();
+  const result = [];
+  for (const item of oids) {
+    if (!isOid(item)) {
+      continue;
+    }
+    const key = `${item}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
+/**
+ * Convert ObjectId to Date
+ * @param {any} value - Value to convert to Date
+ * @param {any} [fallback=null] - Value to return when conversion fails
+ * @returns {Date|any} Date object or fallback
+ */
+function toDate(value, fallback = null) {
+  if (!isOid(value)) {
+    return fallback;
+  }
+  return value.getTimestamp();
+}
+
+/**
+ * Convert value to string using template interpolation
+ * 
+ * Note: This function converts all values to strings as-is, including null and undefined.
+ * If you need different behavior (e.g., null/undefined → fallback), consider using
+ * lodash's _.toString() or other string conversion utilities.
+ * 
+ * @param {any} value - Value to convert to string
  * @returns {string} String representation
  */
-function toString(oid) {
-  if (!isOid(oid)) {
-    throw new Error('Argument must be an ObjectId instance');
-  }
-  return oid.toString();
+function toStr(value) {
+  return `${value}`;
 }
 
 /**
  * Check if first value is after second value
- * @param {ObjectId|Date} value1 - First value to compare
- * @param {ObjectId|Date} value2 - Second value to compare
- * @returns {boolean} True if value1 is after value2
+ * @param {any} value1 - First value to compare
+ * @param {any} value2 - Second value to compare
+ * @returns {boolean} True if value1 is after value2, false on failure
  */
 function isAfter(value1, value2) {
   const date1 = isOid(value1) ? value1.getTimestamp() : value1;
   const date2 = isOid(value2) ? value2.getTimestamp() : value2;
   
   if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
-    throw new Error('Arguments must be ObjectId instances or Date objects');
+    return false;
   }
   
   return date1.getTime() > date2.getTime();
@@ -155,30 +136,37 @@ function isAfter(value1, value2) {
 
 /**
  * Check if first value is before second value
- * @param {ObjectId|Date} value1 - First value to compare
- * @param {ObjectId|Date} value2 - Second value to compare
- * @returns {boolean} True if value1 is before value2
+ * @param {any} value1 - First value to compare
+ * @param {any} value2 - Second value to compare
+ * @returns {boolean} True if value1 is before value2, false on failure
  */
 function isBefore(value1, value2) {
   const date1 = isOid(value1) ? value1.getTimestamp() : value1;
   const date2 = isOid(value2) ? value2.getTimestamp() : value2;
   
   if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
-    throw new Error('Arguments must be ObjectId instances or Date objects');
+    return false;
   }
   
   return date1.getTime() < date2.getTime();
 }
 
 module.exports = {
+  // Creation functions
   newOid,
   newOids,
-  unique,
+  uniqueOids,
+  
+  // Type checking functions
   canBeOid,
   isOid,
   isSameOid,
+  
+  // Conversion functions
   toDate,
-  toString,
+  toStr,
+  
+  // Comparison functions
   isAfter,
   isBefore
 };

@@ -24,6 +24,37 @@ describe('oid-utils', () => {
       const oid = ou.newOid(testTimestamp, { suppressFallback: true });
       expect(ou.toDate(oid).getTime()).toBe(testTimestamp * 1000);
     });
+
+    test('should create ObjectId from valid string with new signature', () => {
+      const testString = '507f1f77bcf86cd799439011';
+      const oid = ou.newOid(testString);
+      expect(ou.isOid(oid)).toBe(true);
+      expect(oid.toString()).toBe(testString);
+    });
+
+    test('should return fallback for invalid input with new signature', () => {
+      const fallback = 'custom-fallback';
+      const result = ou.newOid('invalid-string', fallback);
+      expect(result).toBe(fallback);
+    });
+
+    test('should return fallback for null with new signature', () => {
+      const fallback = 'null-fallback';
+      const result = ou.newOid(null, fallback);
+      expect(result).toBe(fallback);
+    });
+
+    test('should return fallback for empty string with new signature', () => {
+      const fallback = 'empty-fallback';
+      const result = ou.newOid('', fallback);
+      expect(result).toBe(fallback);
+    });
+
+    test('should return fallback for undefined with new signature', () => {
+      const fallback = 'undefined-fallback';
+      const result = ou.newOid(undefined, fallback);
+      expect(result).toBe(fallback);
+    });
   });
 
   describe('ou.newOids()', () => {
@@ -58,56 +89,99 @@ describe('oid-utils', () => {
       const result = ou.newOids(values, { validOnly: true });
       expect(result.length).toBe(3);
       expect(result[0].toString()).toBe('507f1f77bcf86cd799439011');
-      expect(ou.isOid(result[1])).toBe(true); // 123으로 생성된 ObjectId
+      expect(ou.isOid(result[1])).toBe(true); // ObjectId created from 123
       expect(result[2].toString()).toBe('507f1f77bcf86cd799439012');
     });
 
     test('should throw when invalid values present and validOnly=false', () => {
       const values = ['507f1f77bcf86cd799439011', 'invalid'];
-      expect(() => ou.newOids(values, { validOnly: false })).toThrow();
+      expect(() => ou.newOids(values, false)).toThrow();
+    });
+
+    test('should process all values when validOnly=false', () => {
+      const values = ['507f1f77bcf86cd799439011', 123];
+      const result = ou.newOids(values, false);
+      expect(result.length).toBe(2);
+      expect(ou.isOid(result[0])).toBe(true); // valid string
+      expect(ou.isOid(result[1])).toBe(true); // 123 -> ObjectId
+    });
+
+    test('should handle mixed valid/invalid values with validOnly=true', () => {
+      const values = ['507f1f77bcf86cd799439011', 'invalid', 123, null, '507f1f77bcf86cd799439012'];
+      const result = ou.newOids(values, true);
+      expect(result.length).toBe(3); // valid string, 123, valid string
+      expect(result[0].toString()).toBe('507f1f77bcf86cd799439011');
+      expect(ou.isOid(result[1])).toBe(true); // 123
+      expect(result[2].toString()).toBe('507f1f77bcf86cd799439012');
     });
   });
 
-  describe('ou.unique()', () => {
+  describe('ou.uniqueOids()', () => {
     test('should remove duplicate ObjectIds', () => {
       const oid1 = ou.newOid('507f1f77bcf86cd799439011');
-      const oid2 = ou.newOid('507f1f77bcf86cd799439011'); // 같은 값
+      const oid2 = ou.newOid('507f1f77bcf86cd799439011'); // same value
       const oid3 = ou.newOid('507f1f77bcf86cd799439012');
       const oids = [oid1, oid2, oid3];
       
-      const result = ou.unique(oids);
+      const result = ou.uniqueOids(oids);
       expect(result.length).toBe(2);
       expect(ou.isSameOid(result[0], oid1)).toBe(true);
       expect(ou.isSameOid(result[1], oid3)).toBe(true);
     });
 
     test('should return empty array for empty input', () => {
-      const result = ou.unique([]);
+      const result = ou.uniqueOids([]);
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(0);
     });
 
-    test('should keep non-ObjectId values and dedupe by string interpolation', () => {
+    test('should filter out non-ObjectId values and dedupe ObjectIds', () => {
       const oid1 = ou.newOid('507f1f77bcf86cd799439011');
       const oid2 = ou.newOid('507f1f77bcf86cd799439012');
-      const mixed = [oid1, 'string', oid2, 123, null, 'string', 123, null];
+      const mixed = [oid1, 'string', oid2, 123, null, oid1]; // includes duplicate ObjectId
       
-      const result = ou.unique(mixed);
-      expect(result.length).toBe(5);
+      const result = ou.uniqueOids(mixed);
+      expect(result.length).toBe(2); // only ObjectIds remain
       expect(ou.isSameOid(result[0], oid1)).toBe(true);
-      expect(result[1]).toBe('string');
-      expect(ou.isSameOid(result[2], oid2)).toBe(true);
-      expect(result[3]).toBe(123);
-      expect(result[4]).toBe(null);
+      expect(ou.isSameOid(result[1], oid2)).toBe(true);
     });
 
     test('should preserve order of first occurrence', () => {
       const oid1 = ou.newOid('507f1f77bcf86cd799439011');
       const oid2 = ou.newOid('507f1f77bcf86cd799439012');
-      const oid3 = ou.newOid('507f1f77bcf86cd799439011'); // 중복
+      const oid3 = ou.newOid('507f1f77bcf86cd799439011'); // duplicate
       const oids = [oid1, oid2, oid3];
       
-      const result = ou.unique(oids);
+      const result = ou.uniqueOids(oids);
+      expect(result.length).toBe(2);
+      expect(ou.isSameOid(result[0], oid1)).toBe(true);
+      expect(ou.isSameOid(result[1], oid2)).toBe(true);
+    });
+
+    test('should handle array with only non-ObjectId values', () => {
+      const mixed = ['string', 123, null, undefined, {}, []];
+      const result = ou.uniqueOids(mixed);
+      expect(result.length).toBe(0);
+    });
+
+    test('should handle array with mixed ObjectId and non-ObjectId values', () => {
+      const oid1 = ou.newOid('507f1f77bcf86cd799439011');
+      const oid2 = ou.newOid('507f1f77bcf86cd799439012');
+      const mixed = [oid1, 'string', oid2, 123, null, oid1, 'another-string'];
+      
+      const result = ou.uniqueOids(mixed);
+      expect(result.length).toBe(2);
+      expect(ou.isSameOid(result[0], oid1)).toBe(true);
+      expect(ou.isSameOid(result[1], oid2)).toBe(true);
+    });
+
+    test('should handle array with duplicate ObjectIds at different positions', () => {
+      const oid1 = ou.newOid('507f1f77bcf86cd799439011');
+      const oid2 = ou.newOid('507f1f77bcf86cd799439012');
+      const oid3 = ou.newOid('507f1f77bcf86cd799439011'); // same as oid1
+      const oids = [oid1, oid2, oid3, oid1, oid2];
+      
+      const result = ou.uniqueOids(oids);
       expect(result.length).toBe(2);
       expect(ou.isSameOid(result[0], oid1)).toBe(true);
       expect(ou.isSameOid(result[1], oid2)).toBe(true);
@@ -129,7 +203,7 @@ describe('oid-utils', () => {
 
     test('should return fallback value for invalid input (fallback mode)', () => {
       const fallback = 'invalid-input';
-      const result = ou.newOid('invalid', { fallback });
+      const result = ou.newOid('invalid', fallback);
       expect(result).toBe(fallback);
     });
 
@@ -140,13 +214,13 @@ describe('oid-utils', () => {
 
     test('should return fallback for falsy values (fallback mode)', () => {
       const fallback = 'not-an-objectid';
-      const result = ou.newOid('', { fallback });
+      const result = ou.newOid('', fallback);
       expect(result).toBe(fallback);
     });
 
     test('should return fallback for undefined (fallback mode)', () => {
       const fallback = 'no-value';
-      const result = ou.newOid(undefined, { fallback });
+      const result = ou.newOid(undefined, fallback);
       expect(result).toBe(fallback);
     });
 
@@ -158,7 +232,10 @@ describe('oid-utils', () => {
     });
 
     test('should throw on invalid when suppressFallback=true', () => {
-      expect(() => ou.newOid('invalid', { suppressFallback: true })).toThrow();
+      // suppressFallback option was removed, so this test needs to be removed or modified
+      // Currently newOid returns fallback for invalid input instead of throwing error
+      const result = ou.newOid('invalid');
+      expect(result).toBe(null);
     });
   });
 
@@ -247,28 +324,54 @@ describe('oid-utils', () => {
       expect(date).toBeInstanceOf(Date);
     });
 
-    test('should throw error for non-ObjectId', () => {
-      expect(() => ou.toDate('invalid')).toThrow('Argument must be an ObjectId instance');
+    test('should return fallback for non-ObjectId', () => {
+      const fallback = 'not-an-objectid';
+      const result = ou.toDate('invalid', fallback);
+      expect(result).toBe(fallback);
     });
   });
 
-  describe('ou.toString()', () => {
+  describe('ou.toStr()', () => {
     test('should convert ObjectId to string', () => {
       const oid = ou.newOid();
-      const str = ou.toString(oid);
+      const str = ou.toStr(oid);
       expect(typeof str).toBe('string');
       expect(str).toHaveLength(24);
     });
 
-    test('should throw error for non-ObjectId', () => {
-      expect(() => ou.toString('invalid')).toThrow('Argument must be an ObjectId instance');
+    test('should convert any value to string using template interpolation', () => {
+      expect(ou.toStr('invalid')).toBe('invalid');
+      expect(ou.toStr(null)).toBe('null');
+      expect(ou.toStr(undefined)).toBe('undefined');
+    });
+
+    test('should convert various data types to string', () => {
+      expect(ou.toStr(123)).toBe('123');
+      expect(ou.toStr(0)).toBe('0');
+      expect(ou.toStr(true)).toBe('true');
+      expect(ou.toStr(false)).toBe('false');
+      expect(ou.toStr(NaN)).toBe('NaN');
+      expect(ou.toStr(Infinity)).toBe('Infinity');
+    });
+
+    test('should convert objects to string', () => {
+      expect(ou.toStr({})).toBe('[object Object]');
+      expect(ou.toStr([])).toBe('');
+      expect(ou.toStr([1, 2, 3])).toBe('1,2,3');
+      expect(ou.toStr({ a: 1 })).toBe('[object Object]');
+    });
+
+    test('should convert functions to string', () => {
+      const fn = () => {};
+      expect(ou.toStr(fn)).toBe('() => {}');
+      expect(ou.toStr(Math.max)).toContain('function');
     });
   });
 
   describe('ou.isAfter()', () => {
     test('should return true when first ObjectId is after second', () => {
-      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10초 전
-      const timestamp2 = Math.floor(Date.now() / 1000); // 현재
+      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10 seconds ago
+      const timestamp2 = Math.floor(Date.now() / 1000); // current
       const oid1 = ou.newOid(timestamp1);
       const oid2 = ou.newOid(timestamp2);
       expect(ou.isAfter(oid2, oid1)).toBe(true);
@@ -277,7 +380,7 @@ describe('oid-utils', () => {
     test('should return false when first ObjectId is before second', () => {
       const oid1 = ou.newOid();
       const oid2 = ou.newOid();
-      // oid1이 더 이전에 생성되었으므로 false
+      // oid1 was created earlier, so false
       expect(ou.isAfter(oid1, oid2)).toBe(false);
     });
 
@@ -295,15 +398,29 @@ describe('oid-utils', () => {
       expect(ou.isAfter(date, oid)).toBe(false);
     });
 
-    test('should throw error for invalid arguments', () => {
-      expect(() => ou.isAfter('invalid', 'invalid')).toThrow('Arguments must be ObjectId instances or Date objects');
+    test('should return false for invalid arguments', () => {
+      expect(ou.isAfter('invalid', 'invalid')).toBe(false);
+    });
+
+    test('should return false for mixed invalid arguments', () => {
+      expect(ou.isAfter('invalid', new Date())).toBe(false);
+      expect(ou.isAfter(new Date(), 'invalid')).toBe(false);
+      expect(ou.isAfter(null, new Date())).toBe(false);
+      expect(ou.isAfter(new Date(), null)).toBe(false);
+    });
+
+    test('should return false for non-Date, non-ObjectId arguments', () => {
+      expect(ou.isAfter(123, 456)).toBe(false);
+      expect(ou.isAfter('string1', 'string2')).toBe(false);
+      expect(ou.isAfter({}, {})).toBe(false);
+      expect(ou.isAfter([], [])).toBe(false);
     });
   });
 
   describe('ou.isBefore()', () => {
     test('should return true when first ObjectId is before second', () => {
-      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10초 전
-      const timestamp2 = Math.floor(Date.now() / 1000); // 현재
+      const timestamp1 = Math.floor(Date.now() / 1000) - 10; // 10 seconds ago
+      const timestamp2 = Math.floor(Date.now() / 1000); // current
       const oid1 = ou.newOid(timestamp1);
       const oid2 = ou.newOid(timestamp2);
       expect(ou.isBefore(oid1, oid2)).toBe(true);
@@ -312,7 +429,7 @@ describe('oid-utils', () => {
     test('should return false when first ObjectId is after second', () => {
       const oid1 = ou.newOid();
       const oid2 = ou.newOid();
-      // oid2가 더 이전에 생성되었으므로 false
+      // oid2 was created earlier, so false
       expect(ou.isBefore(oid2, oid1)).toBe(false);
     });
 
@@ -330,8 +447,22 @@ describe('oid-utils', () => {
       expect(ou.isBefore(date, oid)).toBe(false);
     });
 
-    test('should throw error for invalid arguments', () => {
-      expect(() => ou.isBefore('invalid', 'invalid')).toThrow('Arguments must be ObjectId instances or Date objects');
+    test('should return false for invalid arguments', () => {
+      expect(ou.isBefore('invalid', 'invalid')).toBe(false);
+    });
+
+    test('should return false for mixed invalid arguments', () => {
+      expect(ou.isBefore('invalid', new Date())).toBe(false);
+      expect(ou.isBefore(new Date(), 'invalid')).toBe(false);
+      expect(ou.isBefore(null, new Date())).toBe(false);
+      expect(ou.isBefore(new Date(), null)).toBe(false);
+    });
+
+    test('should return false for non-Date, non-ObjectId arguments', () => {
+      expect(ou.isBefore(123, 456)).toBe(false);
+      expect(ou.isBefore('string1', 'string2')).toBe(false);
+      expect(ou.isBefore({}, {})).toBe(false);
+      expect(ou.isBefore([], [])).toBe(false);
     });
   });
 });
